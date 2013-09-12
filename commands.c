@@ -67,8 +67,9 @@ int patternCmd(char *argv[],unsigned short argc){
     //port offsets from P1
     unsigned char P_idx[MAX_PORT_NUM];
     //port output registers
-    volatile unsigned char *(p_out[MAX_PORT_NUM]);
+    volatile unsigned char *(p_out[MAX_PORT_NUM]),*addr;
     unsigned char m;
+    int state;
     //check for at least one argument
     if(argc==0){
         //user must supply at least one port
@@ -181,10 +182,16 @@ int patternCmd(char *argv[],unsigned short argc){
     i=0;
     printf("Running pattern test.\r\nPress any key to terminate.");
     while(UCA1_CheckKey()==EOF){
+        //get port address
+        addr=p_out[i];
+        //disable interrupts so pulses are of consistent length
+        state=ctl_global_interrupts_set(0);
         //set high
-        *(p_out[i])|=m;
+        *(addr)|=m;
         //set low
-        *(p_out[i])&=~m;
+        *(addr)&=~m;
+        //restore interrupts to there previous state
+        ctl_global_interrupts_set(state);
         //shift mask
         m<<=1;
         //all 8 bits?
