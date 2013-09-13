@@ -63,7 +63,8 @@ int clkCmd(char *argv[],unsigned short argc){
 #define MAX_PORT_NUM    8
 
 int patternCmd(char *argv[],unsigned short argc){
-    unsigned short tmp,num=0,i;
+    unsigned short tmp,num=0;
+    int i,j;
     //port offsets from P1
     unsigned char P_idx[MAX_PORT_NUM];
     //port output registers
@@ -178,33 +179,35 @@ int patternCmd(char *argv[],unsigned short argc){
                 printf("Unknown Error\r\n");
         }
     }
-    m=1;
-    i=0;
     printf("Running pattern test.\r\nPress any key to terminate.");
-    while(UCA1_CheckKey()==EOF){
-        //get port address
-        addr=p_out[i];
-        //disable interrupts so pulses are of consistent length
-        state=ctl_global_interrupts_set(0);
-        //set high
-        *(addr)|=m;
-        //set low
-        *(addr)&=~m;
-        //restore interrupts to there previous state
-        ctl_global_interrupts_set(state);
-        //shift mask
-        m<<=1;
-        //all 8 bits?
-        if(m==0){
-            //yes reset and goto next
-            m=1;
-            i++;
-            if(i>=num){
-                //wrap
-                i=0;
-            }
+    //disable interrupts so pulses are of consistent length
+    state=ctl_global_interrupts_set(0);
+    for(;;){
+        //pulse each port
+        for(i=0;i<num;i++){
+          //get port address
+          addr=p_out[i];
+          //pulse each bit on port
+          for(j=0,m=1;j<8;j++,m<<=1){
+            //set high
+            *(addr)|=m;
+            //set low
+            *(addr)&=~m;
+          }
         }
+        //enable interrupts so that keys are received
+        ctl_global_interrupts_set(1);
+        //check for keypress
+        if(UCA1_CheckKey()!=EOF){
+          //exit loop
+          break;
+        }
+        //disable interrupts again
+        ctl_global_interrupts_set(0);
     }
+    //restore interrupts to there previous state
+    ctl_global_interrupts_set(state);
+    //print ending message
     printf("\r\nPattern test terminated.\r\n");
     //clear output bits and set pins to input
     for(i=0;i<argc;i++){
