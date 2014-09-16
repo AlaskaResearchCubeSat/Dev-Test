@@ -13,6 +13,10 @@ int __putchar(int ch){
   return UCA1_TxChar(ch);
 }
 
+int __getchar(void){
+  return UCA1_Getc();
+}
+
 //make clocks available for measuring by outputting them to pins
 int clkCmd(char *argv[],unsigned short argc){
     unsigned short bgnd=0,stop=0;

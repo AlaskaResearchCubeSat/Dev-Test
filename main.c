@@ -39,7 +39,6 @@ void start_term(void *p){
 }
 
 void main(void){
-  const TERM_SPEC uart_term={"ARC Development Test Program Ready",UCA1_Getc};
   P7OUT=0xFF;
   P7DIR=0xFF;
   //initialize clocks
@@ -62,7 +61,7 @@ void main(void){
   P7OUT=0;
 
   //create tasks
-  ctl_task_run(&terminal_task,2,start_term,(void*)&uart_term,"terminal",sizeof(stack1)/sizeof(stack1[0])-2,stack1+1,0);
+  ctl_task_run(&terminal_task,2,start_term,"ARC Development Test Program Ready","terminal",sizeof(stack1)/sizeof(stack1[0])-2,stack1+1,0);
   
   // drop to lowest priority to start created tasks running.
   ctl_task_set_priority(&idle_task,0);
