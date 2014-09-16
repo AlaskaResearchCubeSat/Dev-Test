@@ -313,7 +313,7 @@ int busCmd(char *argv[],unsigned short argc){
     P3OUT=0;
     P3REN=0;
     P3SEL&=~(BIT0|BIT1|BIT2|BIT4|BIT5);
-    P3DIR&=~(BIT0|BIT1|BIT2|BIT4|BIT5);
+    P3DIR|= (BIT0|BIT1|BIT2|BIT4|BIT5);
     //wait for key press
     while(UCA1_CheckKey()==EOF){
         *port[i]=m[i];
