@@ -5,6 +5,7 @@
 #include <UCA1_uart.h>
 #include <terminal.h>
 #include "timer.h"
+#include "pins.h"
 
 //task structure for idle task
 CTL_TASK_t idle_task;
@@ -17,15 +18,17 @@ unsigned stack1[1+256+1];
 
 void initCLK(void){
   //set XT1 load caps, do this first so XT1 starts up sooner
-  BCSCTL3=XCAP_0;
+  UCSCTL6=XCAP_0|XT2OFF|XT1DRIVE_3;
   //stop watchdog
   WDTCTL = WDTPW|WDTHOLD;
+
+//TODO: change core voltage and DCO frequency
+
+
   //setup clocks
 
-  //set DCO to 16MHz from calibrated values
-  DCOCTL=0;
-  BCSCTL1=CALBC1_16MHZ;
-  DCOCTL=CALDCO_16MHZ;
+  //use XT1 for ACLK and DCO for MCLK and SMCLK
+  UCSCTL4=SELA_0|SELS_3|SELM_3;
 }
 
 //prototype for clkCmd so it can be called from start_term
@@ -46,7 +49,7 @@ void main(void){
   //setup timerA
   init_timerA();
   //initialize UART
-  UCA1_init_UART();
+  UCA1_init_UART(UART_PORT,UART_TX_PIN,UART_RX_PIN);
 
  //initialize tasking
   ctl_task_init(&idle_task, 255, "idle");  

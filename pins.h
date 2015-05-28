@@ -2,103 +2,28 @@
 #ifndef _PINS_H
 #define _PINS_H
 
-//defines for fast and flexible msp430 pin code
-//many macros have an underscore version for macro expansion
-//allows a group of pins to be defined by the following define
-//#define [identifier]  [port],[mask],[number of lowest order bit]
-//for instance the following define defines the pins for UCA0 in UART mode
-//#define UCA0P_UART    P3,BIT4|BIT5,4
+#define CLOCK_PINS        (BIT2|BIT5|BIT4)
+#define CLOCK_DIR         P1DIR
+#define CLOCK_SEL0        P1SEL0
+#define CLOCK_SEL1        P1SEL1
 
-//used by pinInt macro
-//tells which ports have interrupt capability
-#define P1INT   1
-#define P2INT   1
-#define P3INT   0
-#define P4INT   0
-#define P5INT   0
-#define P6INT   0
-#define P7INT   0
-#define P8INT   0
+#define UART_TX_PIN       BIT5
+#define UART_RX_PIN       BIT6
+#define UART_PINS         (UART_RX_PIN|UART_TX_PIN)
+#define UART_PORT         3
 
-//set all pins to inputs
-#define setInput(ps...)     _pinBIC(ps,DIR)
-//set all pins to outputs
-#define setOutput(ps...)    _pinBIS(ps,DIR)
-//toggle pin direction
-#define pinDirToggle(ps...) _pinINV(ps,DIR)
-//set pin direction
-#define pinDirSet(ps,v...)  _pinSET(ps,v,DIR)
+//define serial pins
+#define BUS_PIN_SDA       BIT1
+#define BUS_PIN_SCL       BIT0
 
-//set all pins high
-#define setHigh(ps...)      _pinBIS(ps,OUT)
-//set all pins to low
-#define setLow(ps...)       _pinBIC(ps,OUT)
-//toggle all pins
-#define pinToggle(ps...)    _pinINV(ps,OUT)
+#define BUS_PINS_I2C      (BUS_PIN_SDA|BUS_PIN_SCL)
 
-#define pinXOR(ps,v...)     _pinXOR(ps,v,OUT)
+#define BUS_PIN_SCK       BIT2
+#define BUS_PIN_SOMI      BIT3
+#define BUS_PIN_SIMO      BIT4
+  
+#define BUS_PINS_SPI      (BUS_PIN_SOMI|BUS_PIN_SIMO|BUS_PIN_SCK)  
 
-//set pullup on all pins
-#define setPullup(ps...)    ({_pinBIS(ps,REN);_pinBIS(ps,OUT);})
-//setup pulldown on all pins
-#define setPulldown(ps...)  ({_pinBIS(ps,REN);_pinBIC(ps,OUT);})
-
-//disable pull for all pins
-#define disablePull(ps...)  _pinBIC(ps,REN)
-//enable pull for all pins
-#define enablePull(ps...)   _pinBIS(ps,REN)
-
-//set rising edge interrupt on pin
-//causes an error if pin is not interruptable
-#define pinRising(ps...)    _pinBIC(ps,IES)
-//set falling edge interrupt on pin
-//causes an error if pin is not interruptable
-#define pinFalling(ps...)   _pinBIS(ps,IES)
-
-//clear interrupt flag for pin 
-//causes an error if pin is not interruptable
-#define pinClrIFG(ps...)    _pinBIC(ps,IFG)
-
-//determines if port has interrupt pin capibility
-#define pinINT(ps...)       _pinINT(ps)
-#define _pinINT(pt,pm,s)    (pt##INT)
-
-//get the shift value from pin define
-#define pinShift(ps...)     _pinShift(ps)
-#define _pinShift(pt,pm,s)  s
-
-//enable interruts for pins
-//causes an error if pin is not interruptable
-#define pinIEN(ps...)       _pinBIS(ps,IE)
-//disable interruts for pins
-//causes an error if pin is not interruptable
-#define pinIEdisable(ps...) _pinBIC(ps,IE)
-
-//select peripheral functions for pins
-#define setSel(ps...)       _pinBIS(ps,SEL)
-//deselect peripheral functions for pins
-#define clrSel(ps...)       _pinBIC(ps,SEL)
-
-//get mask for pins
-#define pinMask(ps...)      _pinMask(ps)
-#define _pinMask(pt,pm,s)   (pm)
-
-//write a value to pins
-#define pinSet(ps,v...)     _pinSET(ps,v,OUT)
-
-//read value from input pins
-#define pinGet(ps...)       _pinGet(ps)
-#define _pinGet(pt,pm,s)    ((pt##IN&(pm))>>(s))
-
-//helper macros used above
-#define _pinBIC(pt,pm,d,reg)    (pt##reg&=~(pm))
-#define _pinBIS(pt,pm,d,reg)    (pt##reg|=(pm))
-#define _pinINV(pt,pm,d,reg)    (pt##reg^=(pm))
-#define _pinXOR(pt,pm,s,v,reg)  (pt##reg^=((pm)&((v)<<(s))))
-//TODO: this code could cause issues if 16 bit ports are used
-#define _pinSET(pt,pm,s,v,reg)  if((pm)==0xFF){\
-                                    pt##reg=((typeof(pt##reg))((v)<<(s)));\
-                                }else{\
-                                    pt##reg=(((pt##reg)&~(pm))|(((pm))&((v)<<(s))));}
+#define BUS_PINS_SER      (BUS_PINS_SPI|BUS_PINS_I2C)
 
 #endif

@@ -5,8 +5,10 @@
 #include <ctl.h>
 #include <UCA1_uart.h>
 #include <terminal.h>
+#include "pins.h"
 
 #define ARRAY_SIZE(a) (sizeof(a)/sizeof(a[0]))
+
 
 //make printf send over UCA1
 int __putchar(int ch){
@@ -34,9 +36,9 @@ int clkCmd(char *argv[],unsigned short argc){
         }
     }
     if(!stop){
-        //output clocks on P5 pins
-        P5SEL=BIT4|BIT5|BIT6;
-        P5DIR=BIT4|BIT5|BIT6;
+        //output clocks on clock pins
+        CLOCK_SEL0=CLOCK_PINS;
+        CLOCK_DIR=CLOCK_PINS;
     }
     //if not stopping or background wait for input
     //from user so that measurements can be taken
@@ -54,8 +56,9 @@ int clkCmd(char *argv[],unsigned short argc){
     }
     //if not background then clear select bits
     if(!bgnd){
-        P5SEL&=~(BIT4|BIT5|BIT6);
-        P5DIR&=~(BIT4|BIT5|BIT6);
+        CLOCK_SEL0&=~CLOCK_PINS;
+        CLOCK_SEL1&=~CLOCK_PINS;
+        CLOCK_DIR&=~CLOCK_PINS;
     }
     //if in background mode clocks still being outputted now
     //otherwise clock pins are now inputs
@@ -116,7 +119,8 @@ int patternCmd(char *argv[],unsigned short argc){
                 p_out[i]=&P1OUT;
                 P1OUT=0;
                 P1DIR=0xFF;
-                P1SEL=0;
+                P1SEL0=0;
+                P1SEL1=0;
                 P1REN=0;
             break;
             case 1:
@@ -124,7 +128,8 @@ int patternCmd(char *argv[],unsigned short argc){
                 p_out[i]=&P2OUT;
                 P2OUT=0;
                 P2DIR=0xFF;
-                P2SEL=0;
+                P2SEL0=0;
+                P2SEL1=0;
                 P2REN=0;
             break;
             case 2:
@@ -135,16 +140,22 @@ int patternCmd(char *argv[],unsigned short argc){
                 P3REN=0;
                 //clear select pins except for P3.6 and P3.7
                 //these are required for UART usage
-                P3SEL&=BIT6|BIT7;
+                P3SEL0&=UART_PINS;
                 //inform the user that P3.6 and P3.7 will not work
-                printf("Warning: P3.6 and P3.7 not used in pattern test.\r\n");
+                printf("Warning: ");
+                for(i=0;i<8;i++){
+                  if(UART_PINS&(1<<i)){
+                    printf("P%i.%i",UART_PORT,(1<<i));
+                  }
+                }
+                printf(" not used in pattern test.\r\n");
             break;
             case 3:
                 //P4
                 p_out[i]=&P4OUT;
                 P4OUT=0;
                 P4DIR=0xFF;
-                P4SEL=0;
+                P4SEL0=0;
                 P4REN=0;
             break;
             case 4:
@@ -152,7 +163,8 @@ int patternCmd(char *argv[],unsigned short argc){
                 p_out[i]=&P5OUT;
                 P5OUT=0;
                 P5DIR=0xFF;
-                P5SEL=0;
+                P5SEL0=0;
+                P5SEL1=0;
                 P5REN=0;
             break;
             case 5:
@@ -160,7 +172,8 @@ int patternCmd(char *argv[],unsigned short argc){
                 p_out[i]=&P6OUT;
                 P6OUT=0;
                 P6DIR=0xFF;
-                P6SEL=0;
+                P6SEL0=0;
+                P6SEL1=0;
                 P6REN=0;
             break;
             case 6:
@@ -168,7 +181,7 @@ int patternCmd(char *argv[],unsigned short argc){
                 p_out[i]=&P7OUT;
                 P7OUT=0;
                 P7DIR=0xFF;
-                P7SEL=0;
+                P7SEL0=0;
                 P7REN=0;
             break;
             case 7:
@@ -176,7 +189,7 @@ int patternCmd(char *argv[],unsigned short argc){
                 p_out[i]=&P8OUT;
                 P8OUT=0;
                 P8DIR=0xFF;
-                P8SEL=0;
+                P8SEL0=0;
                 P8REN=0;
             break;
             default :
@@ -255,7 +268,7 @@ int LED_Cmd(char *argv[],unsigned short argc){
   P7OUT=BIT0;
   P7DIR=0xFF;
   P7REN=0;
-  P7SEL=0;
+  P7SEL0=0;
   //setup LED variables
   mask=BIT0;
   dir=1;
@@ -290,9 +303,9 @@ int LED_Cmd(char *argv[],unsigned short argc){
 //drive waveforms on P1 0-7 and P3 0-2 and 4-5
 int busCmd(char *argv[],unsigned short argc){
     //mask array, contains values to write to port
-    const unsigned char m[]={(1<<0),(1<<1),(1<<2),(1<<3),(1<<4),(1<<5),(1<<6),(1<<7),(1<<2),(1<<1),(1<<0),(1<<5),(1<<4)};
+    const unsigned char m[]={(1<<0),(1<<1),(1<<2),(1<<3),(1<<4),(1<<5),(1<<6),(1<<7) ,BUS_PIN_SDA,BUS_PIN_SCL,BUS_PIN_SCK,BUS_PIN_SOMI,BUS_PIN_SIMO};
     //port array contains address of port register to write to
-    volatile unsigned char *(port[])={&P1OUT,&P1OUT,&P1OUT,&P1OUT,&P1OUT,&P1OUT,&P1OUT,&P1OUT,&P3OUT,&P3OUT,&P3OUT,&P3OUT,&P3OUT};
+    volatile unsigned char *(port[])={&P2OUT,&P2OUT,&P2OUT,&P2OUT,&P2OUT,&P2OUT,&P2OUT,&P2OUT, &P3OUT,&P3OUT,&P3OUT,&P3OUT,&P3OUT};
     //last port pointer used for cleanup
     volatile unsigned char *pLast=&P1OUT;
     int i=0;
@@ -305,15 +318,15 @@ int busCmd(char *argv[],unsigned short argc){
     //inform the user that the test is starting
     printf("Preforming Bus Test\r\nPress any key to terminate.\r\n");
     //setup P1 for output
-    P1OUT=0;
-    P1REN=0;
-    P1SEL=0;
+    P2OUT=0;
+    P2REN=0;
+    P2SEL0=0;
     P1DIR=0xFF;
     //setup P3
     P3OUT=0;
     P3REN=0;
-    P3SEL&=~(BIT0|BIT1|BIT2|BIT4|BIT5);
-    P3DIR|= (BIT0|BIT1|BIT2|BIT4|BIT5);
+    P3SEL0&=~(BUS_PINS_SER);
+    P3DIR|= BUS_PINS_SER;
     //wait for key press
     while(UCA1_CheckKey()==EOF){
         *port[i]=m[i];
@@ -344,10 +357,10 @@ unsigned short I2C_T=0;
 //TODO: This test does not test 
 
 //switch I2C pins between input and low states
-void i2c_toggle(void) __interrupt[TIMERB0_VECTOR] {
-    TBCCR0+=I2C_T;
-    P3DIR^=(BIT4|BIT5);
-    P2OUT^=BIT0;
+void i2c_toggle(void) __interrupt[TIMER1_A0_VECTOR] {
+    TA1CCR0+=I2C_T;
+    P3DIR^=(BUS_PINS_I2C);
+    P1OUT^=BIT0;
 }
 
 //repeatedly pull-down the I2C pins
@@ -361,20 +374,20 @@ int I2C_Cmd(char *argv[],unsigned short argc){
         printf("Internal Error.\r\n");
         return 1;
     }
-    //use P2.0 for a trigger
-    P2SEL&=~BIT0;
-    P2OUT&=~BIT0;
-    P2DIR|=BIT0;
+    //use P1.0 for a trigger
+    P1SEL0&=~BIT0;
+    P1OUT&=~BIT0;
+    P1DIR|=BIT0;
     //setup I2C pins
-    P3OUT&=~(BIT4|BIT5);
-    P3DIR&=~(BIT4);
-    P3REN&=~(BIT4|BIT5);
+    P3OUT&=~(BUS_PINS_I2C);
+    P3DIR&=~(BUS_PIN_SDA);
+    P3REN&=~(BUS_PINS_I2C);
     //setup TBCCR0 for I2C testing
-    TBCTL=TBSSEL_2|TBCLR;
+    TA1CTL=TASSEL_2|TACLR;
     I2C_T=freqVals[0];
-    TBCCTL0=CCIE;
-    TBCCR0=40;
-    TBCTL|=MC_2;
+    TA1CCTL0=CCIE;
+    TA1CCR0=40;
+    TA1CTL|=MC_2;
     //Do all tests in array
     for(i=0;i<ARRAY_SIZE(freqNames);i++){
         printf("Preforming %s I2C Test\r\nPress any key for next test.\r\n",freqNames[i]);
@@ -386,8 +399,8 @@ int I2C_Cmd(char *argv[],unsigned short argc){
     //test complete, notify user and exit
     printf("I2C Test complete.\r\n");
     //stop timer
-    TBCCTL0=0;
-    TBCTL=0;
+    TA1CCTL0=0;
+    TA1CTL=0;
     //pins back to inputs
     P3DIR&=~(BIT4|BIT5);
     P2DIR&=~BIT0;
