@@ -42,6 +42,7 @@ void start_term(void *p){
 }
 
 void main(void){
+  //turn on LED's this will flash the LED's during startup
   P7OUT=0xFF;
   P7DIR=0xFF;
   //initialize clocks
@@ -61,6 +62,7 @@ void main(void){
   memset(stack1,0xcd,sizeof(stack1));  // write known values into the stack
   stack1[0]=stack1[sizeof(stack1)/sizeof(stack1[0])-1]=0xfeed; // put marker values at the words before/after the stack
 
+  //turn off LED's
   P7OUT=0;
 
   //create tasks
