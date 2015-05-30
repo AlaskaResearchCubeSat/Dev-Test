@@ -6,6 +6,7 @@
 #include <terminal.h>
 #include "timer.h"
 #include "pins.h"
+#include "vcore.h"
 
 //task structure for idle task
 CTL_TASK_t idle_task;
@@ -22,8 +23,8 @@ void initCLK(void){
   //stop watchdog
   WDTCTL = WDTPW|WDTHOLD;
 
-//TODO: change core voltage and DCO frequency
-
+  //change core voltage and DCO frequency
+  PMM_setVCore(PMM_CORE_LEVEL_3);
 
   //setup clocks
 
