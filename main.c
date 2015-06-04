@@ -53,6 +53,11 @@ void main(void){
   P7DIR=0xFF;
   //initialize clocks
   initCLK();
+  //disable AUX supplies
+  AUXCTL0_H=AUXKEY_H;
+  AUXCTL1=AUX2MD|AUX1MD|AUX0MD|AUX0OK;
+  //disable backup supply
+  //BACKCTL=BAKDIS;
   //setup timerA
   init_timerA();
   //initialize UART
