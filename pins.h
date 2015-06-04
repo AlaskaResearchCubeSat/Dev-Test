@@ -9,6 +9,8 @@
 
 #define UART_TX_PIN       BIT5
 #define UART_RX_PIN       BIT6
+#define UART_TX_PIN_NUM   5
+#define UART_RX_PIN_NUM   6
 #define UART_PINS         (UART_RX_PIN|UART_TX_PIN)
 #define UART_PORT         3
 

@@ -56,7 +56,7 @@ void main(void){
   //setup timerA
   init_timerA();
   //initialize UART
-  UCA1_init_UART(UART_PORT,UART_TX_PIN,UART_RX_PIN);
+  UCA1_init_UART(UART_PORT,UART_TX_PIN_NUM,UART_RX_PIN_NUM);
 
  //initialize tasking
   ctl_task_init(&idle_task, 255, "idle");  
