@@ -421,8 +421,8 @@ int restCmd(char **argv,unsigned short argc){
   puts("Initiating reset\r\n");
   //wait for UART buffer to empty
   while(UCA1_CheckBusy());
-  //write to WDTCTL without password causes PUC
-  WDTCTL=0;
+  //cause a software Brown Out Reset to occur
+  PMMCTL0=PMMPW|PMMSWBOR;
   //Never reached due to reset
   puts("Error : Reset Failed!\r");
   return 0;
