@@ -428,6 +428,88 @@ int restCmd(char **argv,unsigned short argc){
   return 0;
 }
 
+int infoCmd(char **argv,unsigned short argc){
+  enum{ DDT_INFO_FLAG=0x0001,DDT_DIE_FLAG=0x0002,DDT_ADC10_FLAG=0x0004};
+  int fl=0,i,len;
+  unsigned char *ptr;
+  for(i=0;i<argc;i++){
+    if(!strcmp(argv[i+1],"Info")){
+      fl|=DDT_INFO_FLAG;
+    }else if(!strcmp(argv[i+1],"Die")){
+      fl|=DDT_DIE_FLAG;
+    }else if(!strcmp(argv[i+1],"ADC10")){
+      fl|=DDT_ADC10_FLAG;
+    }else{
+      printf("Error : unknown argument \"%s\"\r\n",argv[i+1]);
+      return 1;
+    }
+  }
+  //check CRC for TLV section
+  //initialize CRC module
+  CRCINIRES=0xFFFF;
+  //get CRC length
+  for(ptr=(unsigned char*)TLV_START-4;ptr<=(unsigned char*)TLV_END;ptr++){
+    //read in each byte
+    CRCDIRB_L=*ptr;
+  }
+  //check CRC
+  if(CRCINIRES!=*(unsigned short*)0x1A02){
+    printf("Error : Invalid CRC\r\n");
+    return 2;
+  }
+  //print info block
+  if(fl&DDT_INFO_FLAG || !fl){
+    //check info block length
+    if(0x6!=*(unsigned char*)0x1A00){
+      printf("Error : invalid info block length\r\n");
+      return 3;
+    }
+    printf("Info Block :\r\n");
+    printf("\t""Device ID    : 0x%04X\r\n",*(unsigned short*)0x1A04);
+    printf("\t""Hardware Rev : %u\r\n",*(unsigned char*)0x1A06);
+    printf("\t""Firmware Rev : %u\r\n",*(unsigned char*)0x1A07);
+  }
+  //print die reccord
+  if(fl&DDT_DIE_FLAG){
+    if(TLV_DIERECORD!=*(unsigned char*)0x1A08){
+      printf("Error : invalid Die Record tag\r\n");
+      return 4;
+    }
+    if(0x0A!=*(unsigned char*)0x1A09){
+      printf("Error : invalid Die Record length\r\n");
+      return 5;
+    }
+    printf("Die Record :\r\n");
+    printf("\t""Lot ID         : %lu\r\n",*(unsigned long*)0x1A0A);
+    printf("\t""X pos          : %u\r\n",*(unsigned short*)0x1A0E);
+    printf("\t""X pos          : %u\r\n",*(unsigned short*)0x1A10);
+    printf("\t""Test Record CP : %u\r\n",*(unsigned char*)0x1A12);
+    printf("\t""Test Record FT : %u\r\n",*(unsigned char*)0x1A13);
+  }
+  //print ADC10 calibration data
+  if(fl&DDT_ADC10_FLAG){
+    if(TLV_ADC10CAL!=*(unsigned char*)0x1A14){
+      printf("Error : invalid ADC10 Calibration tag\r\n");
+      return 6;
+    }
+    if(0x10!=*(unsigned char*)0x1A15){
+      printf("Error : invalid ADC10 Calibration length\r\n");
+      return 7;
+    }
+    printf("ADC10 Calibration :\r\n");
+    printf("\t""ADC Gain Factor : %u\r\n",*(unsigned short*)0x1A16);
+    printf("\t""ADC Offset      : %u\r\n",*(unsigned short*)0x1A18);
+    printf("\t""ADC 15T30       : %u\r\n",*(unsigned short*)0x1A1A);
+    printf("\t""ADC 15T85       : %u\r\n",*(unsigned short*)0x1A1C);
+    printf("\t""ADC 20T30       : %u\r\n",*(unsigned short*)0x1A1E);
+    printf("\t""ADC 20T85       : %u\r\n",*(unsigned short*)0x1A20);
+    printf("\t""ADC 25T30       : %u\r\n",*(unsigned short*)0x1A22);
+    printf("\t""ADC 25T85       : %u\r\n",*(unsigned short*)0x1A24);
+  }
+  return 0;
+}
+
+
 //table of commands with help
 const CMD_SPEC cmd_tbl[]={{"help"," [command]",helpCmd},
                     {"reset","\r\n\t""Reset the MSP430",restCmd},
@@ -436,5 +518,6 @@ const CMD_SPEC cmd_tbl[]={{"help"," [command]",helpCmd},
                     {"LED","\r\n\t""Blink LEDS in sequence",LED_Cmd},
                     {"bus","\r\n\t""Output pattern on BUS pins",busCmd},
                     {"I2C","\r\n\t""Toggle I2C pins",I2C_Cmd},
+                    {"info","\r\n\t""Print Device Information",infoCmd},
                    //end of list
                    {NULL,NULL,NULL}};
