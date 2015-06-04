@@ -380,8 +380,10 @@ int I2C_Cmd(char *argv[],unsigned short argc){
     P1DIR|=BIT0;
     //setup I2C pins
     P3OUT&=~(BUS_PINS_I2C);
-    P3DIR&=~(BUS_PIN_SDA);
+    P3DIR&=~(BUS_PINS_I2C);
     P3REN&=~(BUS_PINS_I2C);
+    //start SDA high so that waveforms are out of phase
+    P3DIR|=BUS_PIN_SDA;
     //setup TBCCR0 for I2C testing
     TA1CTL=TASSEL_2|TACLR;
     I2C_T=freqVals[0];
