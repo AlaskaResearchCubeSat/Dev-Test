@@ -509,6 +509,159 @@ int infoCmd(char **argv,unsigned short argc){
   return 0;
 }
 
+//ADC events
+CTL_EVENT_SET_t SD24_events;
+
+//events for SD24
+enum {SD24_OVERFLOW_EVT=SD24OVIFG0};
+
+unsigned long SD24_results[7];
+
+#define SD24_read(ch)     {unsigned long val;val =(unsigned long)SD24BMEML##ch;val|=((unsigned long)SD24BMEMH##ch)<<16;SD24_results[ch]=val;}
+
+void SD24_ISR(void) __ctl_interrupt[SD24B_VECTOR]{
+  switch(SD24BIV){
+    case SD24BIV_SD24OVIFG:
+      ctl_events_set_clear(&SD24_events,SD24_OVERFLOW_EVT,0);
+      //clear interrupts
+      SD24BIFG&=~(SD24OVIFG0|SD24OVIFG1|SD24OVIFG2|SD24OVIFG3|SD24OVIFG4|SD24OVIFG5|SD24OVIFG6);
+    return;
+    case SD24BIV_SD24TRGIFG:
+    break;
+    case SD24BIV_SD24IFG0:
+      ctl_events_set_clear(&SD24_events,SD24IFG0,0);
+      //read and store value
+      SD24_read(0);
+    return;
+    case SD24BIV_SD24IFG1:
+      ctl_events_set_clear(&SD24_events,SD24IFG1,0);
+      //read and store value
+      SD24_read(1);
+    return;
+    case SD24BIV_SD24IFG2:
+      ctl_events_set_clear(&SD24_events,SD24IFG2,0);
+      //read and store value
+      SD24_read(2);
+    return;
+    case SD24BIV_SD24IFG3:
+      ctl_events_set_clear(&SD24_events,SD24IFG3,0);
+      //read and store value
+      SD24_read(3);
+    return;
+    case SD24BIV_SD24IFG4:
+      ctl_events_set_clear(&SD24_events,SD24IFG4,0);
+      //read and store value
+      SD24_read(4);
+    return;
+    case SD24BIV_SD24IFG5:
+      ctl_events_set_clear(&SD24_events,SD24IFG5,0);
+      //read and store value
+      SD24_read(5);
+    return;
+    case SD24BIV_SD24IFG6:
+      ctl_events_set_clear(&SD24_events,SD24IFG6,0);
+      //read and store value
+      SD24_read(6);
+    return;
+    //unknown interrupt
+    default:
+    break;
+  }
+}
+
+int analogCmd(char **argv,unsigned short argc){
+  unsigned short e;
+  int i,j,error=0;
+  unsigned long result;
+  #define TEST_OSR      0xFF
+  struct{
+    unsigned long min,max;
+    unsigned char mask;
+  }test_dat[4]={{-20,20,0x2A},{-20,20,0x15},{-20,20,0x2A},{-20,20,0x15}};
+  printf("Use shorting jumpers to short P5 to analog pins and press any key to continue\r\n");
+  UCA1_Getc();
+  //setup P5 pins for test
+  P5OUT &=~(BIT0|BIT1|BIT2|BIT3|BIT4|BIT5);
+  P5SEL0&=~(BIT0|BIT1|BIT2|BIT3|BIT4|BIT5);
+  P5SEL1&=~(BIT0|BIT1|BIT2|BIT3|BIT4|BIT5);
+  P5DIR |= (BIT0|BIT1|BIT2|BIT3|BIT4|BIT5);
+  //setup reference
+  //check if reference is busy
+  if(!(REFCTL0&REFGENBUSY)){
+    REFCTL0=REFMSTR|REFVSEL_3|REFON;
+  }else{
+    printf("REF busy! continuing anyway\r\n");
+  }
+  //set ADC settings
+  SD24BCTL0=SD24PDIV_1|SD24DIV1|SD24DIV2|SD24SSEL__SMCLK|SD24OV32;
+  SD24BCTL1=0;
+  //setup ADCs to test
+  SD24BCCTL0 =SD24SNGL|SD24DF_1|SD24SCS__GROUP0;
+  SD24BINCTL0=0;
+  SD24BOSR0  =TEST_OSR;
+  SD24BPRE0  =0x3FF;          //maximum preload to allow inputs to change
+  
+  SD24BCCTL1 =SD24SNGL|SD24DF_1|SD24SCS__GROUP0;
+  SD24BINCTL1=0;
+  SD24BOSR1  =TEST_OSR;
+  SD24BPRE1  =0x3FF;          //maximum preload to allow inputs to change
+  
+  SD24BCCTL2 =SD24SNGL|SD24DF_1|SD24SCS__GROUP0;
+  SD24BINCTL2=0;
+  SD24BOSR2  =TEST_OSR;
+  SD24BPRE2  =0x3FF;          //maximum preload to allow inputs to change
+
+  //setup event
+  ctl_events_init(&SD24_events,0);
+  //clear interrupt flags
+  SD24BIFG=0;
+  //enable interrupts 
+  SD24BIE=SD24OVIE0|SD24IE0|SD24OVIE1|SD24IE1|SD24OVIE2|SD24IE2;
+
+  for(i=0;i<4;i++){
+    //add a new line
+    printf("\r\n");
+    //trigger conversion
+    SD24BCTL1|=SD24GRP0SC;
+
+    //wait for conversion to complete
+    e=ctl_events_wait(CTL_EVENT_WAIT_ALL_EVENTS_WITH_AUTO_CLEAR,&SD24_events,SD24IFG0|SD24IFG1|SD24IFG2,CTL_TIMEOUT_DELAY,1024*2);
+    //clear trigger bit
+    SD24BCTL1&=~SD24GRP0SC;
+    //check for overflow
+    if(e&SD24_OVERFLOW_EVT){
+      printf("Error : overflow detected\r\n");
+      error=1;
+      break;
+    }
+    //check if conversion completed
+    if(e!=(SD24IFG0|SD24IFG1|SD24IFG2)){
+      printf("Error : Timeout\r\n");
+      error=1;
+      //break;
+    }
+    //check results
+    printf("P5OUT = 0x%02X\r\n",P5OUT&0x3F);
+    //print values
+    for(j=0;j<3;j++){
+      printf("AN%i : %li\r\n    : %08lx\r\n",i,SD24_results[i],SD24_results[i]);
+    }
+    //setup new output
+    P5OUT^=test_dat[i].mask;
+  }
+  if(error){
+    printf("There was an error\r\n");
+  }else{
+    printf("There was no error\r\n");
+  }
+  //disable interrupts 
+  SD24BIE=0;
+  //pins back to inputs
+  P5DIR &=~(BIT0|BIT1|BIT2|BIT3|BIT4|BIT5);
+
+  return 0;
+}
+
 
 //table of commands with help
 const CMD_SPEC cmd_tbl[]={{"help"," [command]",helpCmd},
@@ -519,5 +672,6 @@ const CMD_SPEC cmd_tbl[]={{"help"," [command]",helpCmd},
                     {"bus","\r\n\t""Output pattern on BUS pins",busCmd},
                     {"I2C","\r\n\t""Toggle I2C pins",I2C_Cmd},
                     {"info","\r\n\t""Print Device Information",infoCmd},
+                    {"analog","\r\n\t""Test Analog Pins",analogCmd},
                    //end of list
                    {NULL,NULL,NULL}};
