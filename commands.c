@@ -5,6 +5,7 @@
 #include <ctl.h>
 #include <UCA1_uart.h>
 #include <terminal.h>
+#include <limits.h>
 #include "pins.h"
 
 #define ARRAY_SIZE(a) (sizeof(a)/sizeof(a[0]))
@@ -515,7 +516,7 @@ CTL_EVENT_SET_t SD24_events;
 //events for SD24
 enum {SD24_OVERFLOW_EVT=SD24OVIFG0};
 
-unsigned long SD24_results[7];
+long SD24_results[7];
 
 #define SD24_read(ch)     {unsigned long val;val =(unsigned long)SD24BMEML##ch;val|=((unsigned long)SD24BMEMH##ch)<<16;SD24_results[ch]=val;}
 
@@ -572,12 +573,13 @@ void SD24_ISR(void) __ctl_interrupt[SD24B_VECTOR]{
 int analogCmd(char **argv,unsigned short argc){
   unsigned short e;
   int i,j,error=0;
-  unsigned long result;
+  long val;
   #define TEST_OSR      0xFF
+  #define TEST_SCALE    (2.5/(float)(((long)1)<<(3*8)))
   struct{
-    unsigned long min,max;
+    long min,max;
     unsigned char mask;
-  }test_dat[4]={{-20,20,0x2A},{-20,20,0x15},{-20,20,0x2A},{-20,20,0x15}};
+  }test_dat[4]={{-30000,30000,0x2A},{16500000,LONG_MAX,0x15},{-30000,30000,0x2A},{LONG_MIN,-16500000,0x15}};
   printf("Use shorting jumpers to short P5 to analog pins and press any key to continue\r\n");
   UCA1_Getc();
   //setup P5 pins for test
@@ -593,7 +595,7 @@ int analogCmd(char **argv,unsigned short argc){
     printf("REF busy! continuing anyway\r\n");
   }
   //set ADC settings
-  SD24BCTL0=SD24PDIV_1|SD24DIV1|SD24DIV2|SD24SSEL__SMCLK|SD24OV32;
+  SD24BCTL0=SD24PDIV_1|SD24DIV1|SD24DIV2|SD24SSEL__SMCLK|SD24REFS|SD24OV32;
   SD24BCTL1=0;
   //setup ADCs to test
   SD24BCCTL0 =SD24SNGL|SD24DF_1|SD24SCS__GROUP0;
@@ -619,8 +621,6 @@ int analogCmd(char **argv,unsigned short argc){
   SD24BIE=SD24OVIE0|SD24IE0|SD24OVIE1|SD24IE1|SD24OVIE2|SD24IE2;
 
   for(i=0;i<4;i++){
-    //add a new line
-    printf("\r\n");
     //trigger conversion
     SD24BCTL1|=SD24GRP0SC;
 
@@ -631,28 +631,38 @@ int analogCmd(char **argv,unsigned short argc){
     //check for overflow
     if(e&SD24_OVERFLOW_EVT){
       printf("Error : overflow detected\r\n");
-      error=1;
+      error=0xFF;
       break;
     }
     //check if conversion completed
     if(e!=(SD24IFG0|SD24IFG1|SD24IFG2)){
       printf("Error : Timeout\r\n");
-      error=1;
-      //break;
+      error=0x80;
+      break;
     }
-    //check results
-    printf("P5OUT = 0x%02X\r\n",P5OUT&0x3F);
     //print values
     for(j=0;j<3;j++){
-      printf("AN%i : %li\r\n    : %08lx\r\n",i,SD24_results[i],SD24_results[i]);
+      val=SD24_results[j];
+      //check results
+      if(val<test_dat[i].min || val>test_dat[i].max){      
+        printf("\r\nError : AN%i is out of range\r\n\tmeasured value = %f V\r\nMin = %f V\r\nMax = %f V\r\n",j,val*TEST_SCALE,test_dat[i].min*TEST_SCALE,test_dat[i].max*TEST_SCALE);
+        error|=1<<j;
+      }
     }
     //setup new output
     P5OUT^=test_dat[i].mask;
   }
   if(error){
-    printf("There was an error\r\n");
+    if(error!=0xFF && error!=0x80){
+      printf("\r\nThe following channels showed errors:\r\n");
+      for(i=0;i<3;i++){
+        if(error&(1<<i)){
+          printf("\tAN%i\r\n",i);
+        }
+      }
+    }
   }else{
-    printf("There was no error\r\n");
+    printf("All tests passed!!!\r\n");
   }
   //disable interrupts 
   SD24BIE=0;
