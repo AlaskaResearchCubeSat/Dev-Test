@@ -747,7 +747,7 @@ const CMD_SPEC cmd_tbl[]={{"help"," [command]",helpCmd},
                     {"LED","\r\n\t""Blink LEDS in sequence",LED_Cmd},
                     {"bus","\r\n\t""Output pattern on BUS pins",busCmd},
                     {"I2C","\r\n\t""Toggle I2C pins",I2C_Cmd},
-                    {"info","\r\n\t""Print Device Information",infoCmd},
+                    {"info","[Info|Die|ADC10]\r\n\t""Print Device Information",infoCmd},
                     {"analog","\r\n\t""Test Analog Pins",analogCmd},
                     {"SD24","[chan]\r\n\t""Read from SD24",SD24_Cmd},
                    //end of list
