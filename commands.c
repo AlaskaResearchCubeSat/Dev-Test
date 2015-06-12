@@ -673,6 +673,51 @@ int analogCmd(char **argv,unsigned short argc){
 }
 
 
+int SD24_Cmd(char **argv,unsigned short argc){
+  unsigned short e;
+  //setup reference
+  //check if reference is busy
+  if(!(REFCTL0&REFGENBUSY)){
+    REFCTL0=REFMSTR|REFVSEL_3|REFON;
+  }else{
+    printf("REF busy! continuing anyway\r\n");
+  }
+  //set ADC settings
+  SD24BCTL0=SD24PDIV_4|SD24DIV1|SD24DIV2|SD24SSEL__SMCLK|SD24REFS|SD24OV32;
+  SD24BCTL1=0;
+  //setup ADCs to test
+  SD24BCCTL0 =SD24DF_1|SD24SCS__SD24SC;
+  SD24BINCTL0=0;
+  SD24BOSR0  =TEST_OSR;
+  SD24BPRE0  =0;    
+
+  //setup event
+  ctl_events_init(&SD24_events,0);
+  //clear interrupt flags
+  SD24BIFG=0;
+  //enable interrupts 
+  SD24BIE=SD24OVIE0|SD24IE0;
+  //start conversion
+  SD24BCCTL0|=SD24SC;
+  //loop until a key is pressed
+  while(EOF==UCA1_CheckKey()){
+    //wait for conversion to complete
+    e=ctl_events_wait(CTL_EVENT_WAIT_ANY_EVENTS_WITH_AUTO_CLEAR,&SD24_events,SD24IFG0,CTL_TIMEOUT_DELAY,512);
+    if(e==0){
+      printf("\r\nTimeout!\r\n");
+      break;
+    }
+    //print result and erase line
+    printf("\r%f       ",SD24_results[0]*TEST_SCALE);
+  }
+  //stop conversion
+  SD24BCCTL0&=~SD24SC;
+  //disable interrupts 
+  SD24BIE=0;
+  //print message
+  printf("\r\nComplete\r\n");
+}
+
 //table of commands with help
 const CMD_SPEC cmd_tbl[]={{"help"," [command]",helpCmd},
                     {"reset","\r\n\t""Reset the MSP430",restCmd},
@@ -683,5 +728,6 @@ const CMD_SPEC cmd_tbl[]={{"help"," [command]",helpCmd},
                     {"I2C","\r\n\t""Toggle I2C pins",I2C_Cmd},
                     {"info","\r\n\t""Print Device Information",infoCmd},
                     {"analog","\r\n\t""Test Analog Pins",analogCmd},
+                    {"SD24","\r\n\t""Read from SD24",SD24_Cmd},
                    //end of list
                    {NULL,NULL,NULL}};
