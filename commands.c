@@ -72,8 +72,10 @@ int clkCmd(char *argv[],unsigned short argc){
 #define MAX_PORT_NUM    8
 
 int patternCmd(char *argv[],unsigned short argc){
-    unsigned short tmp,num=0;
+    unsigned short num=0;
+    unsigned long tmp;
     int i,j,first;
+    char *end;
     //port offsets from P1
     unsigned char P_idx[MAX_PORT_NUM];
     //port output registers
@@ -100,7 +102,17 @@ int patternCmd(char *argv[],unsigned short argc){
             return -3;
         }
         //parse port number
-        tmp=argv[i][1]-'0';
+        tmp=strtoul(argv[i]+1,&end,10);
+        //check for errors
+        if(argv[i]+1==end){
+          printf("Error: can not parse port number \"%s\".\r\n",argv[i]+1);
+          return -5;
+        }
+        //check for trailing chars
+        if(*end){
+          printf("Error: unknown suffix \"%s\" for port \"%s\".\r\n",end,argv[i]);
+          return -6;
+        }
         //check port number and string length
         if(tmp<MIN_PORT_NUM || tmp>MAX_PORT_NUM || argv[i][2]!='\0'){
             //report error
