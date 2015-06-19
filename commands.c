@@ -96,7 +96,7 @@ int patternCmd(char *argv[],unsigned short argc){
         //must be in the form of Px where x is 1-8 and P is case insensitive
         if(tolower(argv[i][0])!='p'){
             //did not get P
-            printf("Error: %s is not a valid port name. Port names must be supplied in the form of Px.\r\n",MIN_PORT_NUM,MAX_PORT_NUM,argv[i]);
+            printf("Error: %s is not a valid port name. Port names must be supplied in the form of Px.\r\n",argv[i]);
             return -3;
         }
         //parse port number
@@ -104,7 +104,7 @@ int patternCmd(char *argv[],unsigned short argc){
         //check port number and string length
         if(tmp<MIN_PORT_NUM || tmp>MAX_PORT_NUM || argv[i][2]!='\0'){
             //report error
-            printf("Error: %s is not a valid port name. Port names range from %i to %i.\r\n",argv[i]);
+            printf("Error: %s is not a valid port name. Port names range from %i to %i.\r\n",argv[i],MIN_PORT_NUM,MAX_PORT_NUM);
             return -4;
         }
         //store port index
