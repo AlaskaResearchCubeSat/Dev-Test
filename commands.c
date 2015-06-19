@@ -73,7 +73,7 @@ int clkCmd(char *argv[],unsigned short argc){
 
 int patternCmd(char *argv[],unsigned short argc){
     unsigned short tmp,num=0;
-    int i,j;
+    int i,j,first;
     //port offsets from P1
     unsigned char P_idx[MAX_PORT_NUM];
     //port output registers
@@ -140,14 +140,15 @@ int patternCmd(char *argv[],unsigned short argc){
                 P3OUT=0;
                 P3DIR=0xFF;
                 P3REN=0;
-                //clear select pins except for P3.6 and P3.7
+                //clear select pins except for P3.5 and P3.6
                 //these are required for UART usage
                 P3SEL0&=UART_PINS;
-                //inform the user that P3.6 and P3.7 will not work
+                //inform the user that P3.5 and P3.6 will not work
                 printf("Warning: ");
-                for(i=0;i<8;i++){
+                for(first=1,i=0;i<8;i++){
                   if(UART_PINS&(1<<i)){
-                    printf("P%i.%i",UART_PORT,(1<<i));
+                    printf("%sP%i.%i",(first)?"":", ",UART_PORT,i);
+                    first=0;
                   }
                 }
                 printf(" not used in pattern test.\r\n");
