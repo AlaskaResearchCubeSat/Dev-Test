@@ -1,12 +1,19 @@
 #include <msp430.h>
 #include <ctl.h>
 
-//read TA while timer is running
+//read timer while it is running
 short readTA(void){
-  int v=TA0R;
-  //read until two consecutive readings match
-  while(v!=TA0R);
-  return v;
+  //temporary variables for last to TAR's
+  int t1=TA1R,t2;
+  do{
+    //shift values
+    t2=t1;
+    //get new value
+    t1=TA1R;
+  //loop until we get the same value twice
+  }while(t1!=t2);
+  //return timer value
+  return t1;
 }
 
 //setup timer A to run off 32.768kHz xtal
