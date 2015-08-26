@@ -8,6 +8,7 @@
 #include <terminal.h>
 #include <limits.h>
 #include "pins.h"
+#include "timer.h"
 
 #define ARRAY_SIZE(a) (sizeof(a)/sizeof(a[0]))
 
@@ -752,6 +753,354 @@ int SD24_Cmd(char **argv,unsigned short argc){
   printf("\r\nComplete\r\n");
 }
 
+//================[TA0 Interrupt]=========================
+void TA0_int(void) __ctl_interrupt[TIMER0_A1_VECTOR]{
+  switch(TA0IV){
+    //set next ADC trigger
+    case TA0IV_TA0CCR1:
+      TA0CCR1+=16384;
+      //start next conversion
+      ADC10CTL0|=ADC10SC;
+    break;
+  }
+}
+
+unsigned short auxv_meas[4];
+int aux_idx;
+CTL_EVENT_SET_t aux_ev;
+
+//================[ADC10 Interrupt]=========================
+void ADC_int(void) __ctl_interrupt[ADC10_VECTOR]{
+  switch(ADC10IV){
+    case ADC10IV_ADC10IFG:
+      //get sample
+      auxv_meas[aux_idx++]=ADC10MEM0;
+      //check for wraparound
+      if(aux_idx>=4){
+        aux_idx=0;
+        //set event
+        ctl_events_set_clear(&aux_ev,BIT0,0);
+      } 
+      //select next voltage
+      AUXADCCTL&=~AUXADCSEL_3;
+      AUXADCCTL|=aux_idx<<1;
+      if(aux_idx!=0){      
+        //start next conversion
+        ADC10CTL0|=ADC10SC;
+      }
+    break;
+  }
+}
+
+int AUX_Cmd(char **argv,unsigned short argc){
+  unsigned short e;
+  int i,found;
+  unsigned short j;
+  char *end;
+  unsigned char aux_sw;
+  unsigned short aux_th,aux_stat;
+  const char *(aux_names[4])={"DVCC","AUXVCC1","AUXVCC2","AUXVCC3"};
+  const char *(aux_th_names[8])={"1.74","1.94","2.14","2.26","2.40","2.70","3.00","3.00"};
+  const char *(pmm_SVM_names[8])={"1.7","1.9","2.1","2.2","2.35","2.65","3.0","3.0"};
+  const float aux_th_vals[8]={1.74,1.94,2.14,2.26,2.40,2.70,3.00,3.00};
+  const int aux_chg_res[4]={-1,5,10,20};
+  //if arguments given then setup AUX
+  if(argc>0){
+    //first argument supply
+    for(i=0,found=0;i<4;i++){
+      if(!strcmp(argv[1],aux_names[i])){
+        found=1;
+        break;
+      }
+    }
+    //check if name matched
+    if(!found){
+      printf("Error : Unknown supply \"%s\"\r\n",argv[1]);
+      return 1;
+    }
+    //check if a command is given
+    if(argc>1){
+      //read command
+      if(!strcmp(argv[2],"CHG")){
+        unsigned long res;
+        unsigned short chg_val;
+        //AUXVCC1 and DVCC don't support charging
+        if(i<2){
+          printf("Error : %s does not support charging\r\n",argv[1]);
+          return 3;
+        }
+        //check if charging resistor was given
+        if(argc<3){
+          printf("Error : charge resistance not given\r\n");
+          return 4;
+        }
+        //check if too many arguments given
+        if(argc>3){
+          printf("Error : too many arguments\r\n");
+          return 5;
+        }
+        if(!strcmp(argv[3],"OFF")){
+          //turn charger off
+          chg_val=AUXCHKEY;
+        }else{
+          //parse charge resistor
+          res=strtoul(argv[3],&end,10);
+          //check if there was an error
+          if(argv[3]==end){
+            printf("Error : failed to parse charge resistor \"%s\"\r\n",argv[3]);
+            return 6;
+          }
+          //check for suffix
+          if(*end!='\0'){
+            if(!strcmp(end,"k")){
+              res*=1000;
+            }else{
+              printf("Error : unknown suffix \"%s\" for charge resistor\r\n",end);
+              return 7;
+            }
+          }
+          //compute value for register
+          res=(res+2500)/5000;
+          //maximum value is 4
+          res=res>3?3:res;
+          //compose value
+          chg_val=AUXCHKEY|AUXCHV_1|(res<<1)|AUXCHEN;
+        }
+        //write to charging register
+        if(i==2){
+          AUX2CHCTL=chg_val;
+        }else{
+          AUX3CHCTL=chg_val;
+        }
+      }else if(!strcmp(argv[2],"ON")){
+        //check for AUXVCC3
+        if(i==3){
+          printf("Error : AUXVCC3 does not support switching\r\n");
+          return 8;
+        }
+        //unlock AUX
+        AUXCTL0_H=AUXKEY_H;
+        //set AXUxMD and AUXxOK
+        AUXCTL1|=(AUX0OK|AUX0MD)<<i;
+        //lock AUX
+        AUXCTL0_H=0;
+      }else if(!strcmp(argv[2],"OFF")){
+        //check for AUXVCC3
+        if(i==3){
+          printf("Error : AUXVCC3 does not support switching\r\n");
+          return 8;
+        }
+        //unlock AUX
+        AUXCTL0_H=AUXKEY_H;
+        //set AXUxMD
+        AUXCTL1|=(AUX0OK)<<i;
+        //clear AUXxOK
+        AUXCTL1&=~(AUX0OK<<i);
+        //lock AUX
+        AUXCTL0_H=0;
+      }else if(!strcmp(argv[2],"HW")){
+        //check for AUXVCC3
+        if(i==3){
+          printf("Error : AUXVCC3 does not support switching\r\n");
+          return 8;
+        }
+        //unlock AUX
+        AUXCTL0_H=AUXKEY_H;
+        //clear AUXxMD
+        AUXCTL1&=~(AUX0MD<<i);
+        //lock AUX
+        AUXCTL0_H=0;
+      }else if(!strcmp(argv[2],"TH")){
+        unsigned short tmp;
+        float th;
+        //check for AUXVCC3
+        if(i==3){
+          printf("Error : AUXVCC3 does not support switching threshold\r\n");
+          return 8;
+        }
+        //check if switching threshold was given
+        if(argc<3){
+          printf("Error : switching threshold not given\r\n");
+          return 4;
+        }
+        //check if too many arguments given
+        if(argc>3){
+          printf("Error : too many arguments\r\n");
+          return 5;
+        }
+        //parse switching threshold
+        th=strtof(argv[3],&end);
+        //check if there was an error
+        if(argv[3]==end){
+          printf("Error : failed to parse switching threshold \"%s\"\r\n",argv[3]);
+          return 6;
+        }
+        //check for suffix
+        if(*end!='\0'){
+          if(!strcmp(end,"mV")){
+            th*=1000;
+          }else if(!strcmp(end,"V")){
+            //Nothing to do
+          }else{
+            printf("Error : unknown suffix \"%s\" for switching threshold\r\n",end);
+            return 7;
+          }
+        }
+        //pick a threshold
+        for(j=0,found=0;j<8;j++){
+          //find the largest threshold that is not greater than desired value
+          if(th>=aux_th_vals[j] && (j==7 || th<aux_th_vals[j+1])){
+            //value found
+            found=1;
+            //exit loop
+            break;
+          }
+        }
+        //check if threshold found
+        if(!found){
+          //threshold not found, return error
+          printf("Error : could not find threshold close to %.2f V\r\n",th);
+          return 10;
+        }
+        //read register
+        tmp=AUXCTL2;
+        //clear old level bits
+        tmp&=~(AUX0LVL_7<<(4*i));
+        //set new level bits
+        tmp|= j<<(4*i);
+        //unlock AUX
+        AUXCTL0_H=AUXKEY_H;
+        //set new value
+        AUXCTL2=tmp;
+        //lock AUX
+        AUXCTL0_H=0;
+      }else if(!strcmp(argv[2],"PRI")){
+        if(i==0){
+          printf("DVCC always has priority\r\n");
+          return 0;
+        }
+        if(i==3){
+          printf("AUXVCC3 is not selectable and has no priority\r\n");
+          return 0;
+        }
+        //unlock AUX
+        AUXCTL0_H=AUXKEY_H;
+        if(i==1){
+          //AUXVCC1 has priority
+          AUXCTL1&=~AUX2PRIO;
+        }else{
+          //AUXVCC2 has priority
+          AUXCTL1|=AUX2PRIO;
+        }
+        //lock AUX
+        AUXCTL0_H=0;
+
+      }else{
+        printf("Error : unknown command \"%s\"\r\n",argv[2]);
+        return 2;
+      }
+    }
+    
+    //print info about supply
+    //read status
+    aux_sw=AUXCTL0_L;
+    aux_th=AUXCTL2;
+    aux_stat=AUXCTL1;
+    //check if AUXVCC1 or AUXVCC2
+    if(i==1 ||i==2){
+      //print supply priority
+      printf("%s has priority\r\n",(aux_stat&AUX2PRIO)?"AUXVCC2":"AUXVCC1");
+    }
+    //print information about selectable supplies
+    if(i<3){
+      printf("%s switch %s\r\n",aux_names[i],(aux_sw&(BIT1<<i))?"closed":"open");
+      j=(aux_th>>(4*i))&0x07;
+      printf("threshold = %s V (%i)\r\n""Status = %s\r\n""Control = %s\r\n",aux_th_names[j],j,(aux_stat&(BIT0<<i))?"OK":"Not OK",(aux_stat&(BIT8<<i))?"Software":"Hardware");
+    }
+    //check for DVCC
+    if(i==0){
+      unsigned short pmm_th=SVSMHCTL&SVSMHRRL_7;
+      //print SVM threshold
+      printf("SVSMHRRL = %s V (%i)\r\n",pmm_SVM_names[pmm_th],pmm_th);
+    }
+    //check if there is a charger
+    if(i>1){
+      unsigned char aux_chg=(i==2)?AUX2CHCTL_L:AUX3CHCTL_L,v,r;
+      v=(aux_chg>>4)&0x03;
+      r=(aux_chg>>1)&0x03;
+      //check if charger is enabled
+      if(r==0 || v==0 || !(aux_chg&AUXCHEN)){
+        printf("Charger Disabled\r\n");
+      }else{
+        printf("Charger:\r\n\t""End voltage = %s\r\n\t""Charge Resistor = %ik ohm\r\n",(v==0x01)?"3.3 V":"Invalid",aux_chg_res[r]);
+      }
+    }
+    return 0;
+  }
+  //setup voltage reference
+  REFCTL0=REFMSTR|REFVSEL_0|REFON;
+  //Disable conversion so that we can setup the ADC
+  ADC10CTL0&=~ADC10ENC;
+  ADC10CTL0=ADC10SHT_10|ADC10MSC|ADC10ON;
+  //ADC10CTL1=ADC10SHS_1|ADC10SHP|ADC10DIV_0|ADC10SSEL_3|ADC10CONSEQ_2;
+  ADC10CTL1=ADC10SHS_0|ADC10SHP|ADC10DIV_0|ADC10SSEL_3|ADC10CONSEQ_0;
+  ADC10CTL2=ADC10PDIV__4|ADC10RES;
+  //setup conversion memory, read 
+  ADC10MCTL0=ADC10SREF_1|ADC10INCH_12;
+  //clear ADC interrupt flags
+  ADC10IFG=0;
+  //enable ADC interrupts
+  ADC10IE=ADC10IE0;
+   // set port 1 digital buffer off
+   P1SEL0|=BIT0;
+   P1SEL1|=BIT0;
+  //enable conversion
+  ADC10CTL0|=ADC10ENC;
+  //setup AUX monitor
+  AUXADCCTL=AUXADCR_0|AUXADCSEL_0|AUXADC;
+  //setup events
+  ctl_events_init(&aux_ev,0);
+  //clear index
+  aux_idx=0;
+  //initialize aux memory
+  auxv_meas[0]=auxv_meas[1]=auxv_meas[2]=auxv_meas[3]=0xFFFF;
+  //setup timer
+  TA0CCR1=readTA()+16*3;
+  TA0CCTL1=CCIE|OUTMOD_5;
+  //set ADC10SC
+  ADC10CTL0|=ADC10SC;
+  //print blank lines
+  for(i=0;i<4;i++){
+    printf(" %7s = --.-- V\r\n",aux_names[i]);
+  }
+  //Read aux supplies with ADC
+  while(UCA1_CheckKey()==EOF){
+    e=ctl_events_wait(CTL_EVENT_WAIT_ANY_EVENTS_WITH_AUTO_CLEAR,&aux_ev,BIT0,CTL_TIMEOUT_DELAY,1024);
+    if(e&BIT0){
+      //get aux supplies
+      aux_sw=AUXCTL0_L;
+      aux_th=AUXCTL2;
+      aux_stat=AUXCTL1;
+      //move the cursor up
+      printf("\x1B[4A\r");
+      for(i=0;i<4;i++){
+        //check if printing AUXVCC3
+        if(i<3){
+          //print wit threshold and indicate if selected
+          printf("\x1B[2K""%c%7s = %.3f V\t%s V\t%c\t%cW\r\n",(aux_sw&(BIT1<<i))?'>':' ',aux_names[i],auxv_meas[i]*(1.5*3)/(1023.0),
+                                                             aux_th_names[(aux_th>>(4*i))&0x07],(aux_stat&(BIT0<<i))?'O':'X',(aux_stat&(BIT8<<i))?'S':'H');
+        }else{
+          //AUXVCC3 is never used for supply and has no thresholds
+          printf("\x1B[2K"" %7s = %.3f V\r\n",aux_names[i],auxv_meas[i]*(1.5*3)/(1023.0));
+          
+        }
+      }
+    }
+  }
+  //user exited
+  return 0;
+}
+
 //table of commands with help
 const CMD_SPEC cmd_tbl[]={{"help"," [command]",helpCmd},
                     {"reset","\r\n\t""Reset the MSP430",restCmd},
@@ -763,5 +1112,6 @@ const CMD_SPEC cmd_tbl[]={{"help"," [command]",helpCmd},
                     {"info","[Info|Die|ADC10]\r\n\t""Print Device Information",infoCmd},
                     {"analog","\r\n\t""Test Analog Pins",analogCmd},
                     {"SD24","[chan]\r\n\t""Read from SD24",SD24_Cmd},
+                    {"aux","\r\n\t""Enable AUX power supplies",AUX_Cmd},
                    //end of list
                    {NULL,NULL,NULL}};

@@ -53,14 +53,28 @@ void main(void){
   P7DIR=0xFF;
   //initialize clocks
   initCLK();
-  //disable AUX supplies
-  AUXCTL0_H=AUXKEY_H;
-  AUXCTL1=AUX2MD|AUX1MD|AUX0MD|AUX0OK;
+  //unlock PMM
+  PMMCTL0_H=PMMPW_H;
+  //check voltage level
+  switch(PMMCTL0&PMMCOREV_3){
+    //settings for highest core voltage settings
+    case PMMCOREV_3:
+      //setup high side supervisor and monitor
+      SVSMHCTL=SVMHE|SVSHE|SVSHRVL_3|SVSMHRRL_5;
+    break;
+    default :
+      //unexpected core voltage, did not set SVM
+      //TODO: do something here?
+    break;
+  }
+  //clear LOCKAUX bit
+  AUXCTL0=(AUXKEY^0x9600)^AUXCTL0&(~LOCKAUX);
+  //lock PMM
+  PMMCTL0_H=0;
   //setup timerA
   init_timerA();
   //initialize UART
   UCA1_init_UART(UART_PORT,UART_TX_PIN_NUM,UART_RX_PIN_NUM);
-
  //initialize tasking
   ctl_task_init(&idle_task, 255, "idle");  
 
