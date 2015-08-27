@@ -1032,7 +1032,7 @@ int AUX_Cmd(char **argv,unsigned short argc){
       if(r==0 || v==0 || !(aux_chg&AUXCHEN)){
         printf("Charger Disabled\r\n");
       }else{
-        printf("Charger:\r\n\t""End voltage = %s\r\n\t""Charge Resistor = %ik ohm\r\n",(v==0x01)?"3.3 V":"Invalid",aux_chg_res[r]);
+        printf("Charger:\r\n\t""End voltage = %s\r\n\t""Charge Resistor = %ik ohm\r\n",(v==0x01)?"VCC":"Invalid",aux_chg_res[r]);
       }
     }
     return 0;
