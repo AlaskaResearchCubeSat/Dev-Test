@@ -1101,6 +1101,47 @@ int AUX_Cmd(char **argv,unsigned short argc){
   return 0;
 }
 
+
+int back_Cmd(char **argv,unsigned short argc){
+  unsigned short *ptr;
+  char *end;
+  unsigned short vals[4];
+  int i;
+  if(argc==0){
+    //print backup memory
+    for(i=0,ptr=(unsigned short*)&BAKMEM0;i<4;i++){
+      printf("BAKMEM%i = 0x%04X\r\n",i,*ptr++);
+    }
+    return 0;
+  }else if(argc==4){
+    //parse arguments and write to backup memory
+    for(i=0,ptr=(unsigned short*)&BAKMEM0;i<4;i++){
+      //parse value
+      vals[i]=strtoul(argv[i+1],&end,0);
+      //check for errors
+      if(argv[i+1]==end){
+        printf("Error: can not parse \"%s\".\r\n",argv[i+1]);
+        return 2;
+      }
+      //check for trailing chars
+      if(*end){
+        printf("Error: unknown suffix \"%s\" for \"%s\".\r\n",end,argv[i+1]);
+        return 3;
+      }
+    }
+    printf("Storing Values to backup memory:\r\n");
+    //store values
+    for(i=0,ptr=(unsigned short*)&BAKMEM0;i<4;i++){
+      *ptr++=vals[i];
+      printf("BAKMEM%i = 0x%04X\r\n",i,vals[i]);
+    }
+    return 0;
+  }
+  //wrong number of arguments given
+  printf("Error : %s requires 0 or 4 arguments but %i given\r\n",argv[0],argc);
+  return 1;
+}
+
 //table of commands with help
 const CMD_SPEC cmd_tbl[]={{"help"," [command]",helpCmd},
                     {"reset","\r\n\t""Reset the MSP430",restCmd},
@@ -1113,5 +1154,6 @@ const CMD_SPEC cmd_tbl[]={{"help"," [command]",helpCmd},
                     {"analog","\r\n\t""Test Analog Pins",analogCmd},
                     {"SD24","[chan]\r\n\t""Read from SD24",SD24_Cmd},
                     {"aux","\r\n\t""Enable AUX power supplies",AUX_Cmd},
+                    {"back","[m0 m1 m2 m3]\r\n\t""Read/Write to the backup memory",back_Cmd},
                    //end of list
                    {NULL,NULL,NULL}};
