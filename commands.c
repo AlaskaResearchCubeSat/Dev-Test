@@ -1118,6 +1118,16 @@ int AUX_Cmd(char **argv,unsigned short argc){
       }
     }
   }
+  //stop timer interrupts
+  TA0CCTL1&=~CCIE;
+  //disable ADC
+  ADC10CTL0&=ADC10ENC;
+  //turn off ADC
+  ADC10CTL0&=ADC10ENC;
+  //disable ref
+  REFCTL0&=~REFON;
+  //disable AUX sampling
+  AUXADCCTL=0;
   //user exited
   return 0;
 }
