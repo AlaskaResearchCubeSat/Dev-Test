@@ -806,6 +806,27 @@ int AUX_Cmd(char **argv,unsigned short argc){
   const int aux_chg_res[4]={-1,5,10,20};
   //if arguments given then setup AUX
   if(argc>0){
+    //check for presets
+    if(!strcmp(argv[1],"tst")){
+      //unlock AUX
+      AUXCTL0_H=AUXKEY_H;
+      //all supplies under hardware control
+      AUXCTL1=0;
+      //setup thresholds 
+      AUXCTL2=AUXMR_0|AUX2LVL_5|AUX1LVL_5|AUX0LVL_7;
+      //disable chargers
+      AUX2CHCTL=AUXCHKEY;
+      AUX3CHCTL=AUXCHKEY;
+      //lock AUX
+      AUXCTL0_H=0;
+      //done return
+      return 0;
+    }else if(!strcmp(argv[1],"ctst")){
+      //enable chargers
+      AUX2CHCTL=AUXCHKEY|AUXCHV_1|AUXCHC_1|AUXCHEN;
+      AUX3CHCTL=AUXCHKEY|AUXCHV_1|AUXCHC_1|AUXCHEN;
+      return 0;
+    }
     //first argument supply
     for(i=0,found=0;i<4;i++){
       if(!strcmp(argv[1],aux_names[i])){
@@ -1153,7 +1174,7 @@ const CMD_SPEC cmd_tbl[]={{"help"," [command]",helpCmd},
                     {"info","[Info|Die|ADC10]\r\n\t""Print Device Information",infoCmd},
                     {"analog","\r\n\t""Test Analog Pins",analogCmd},
                     {"SD24","[chan]\r\n\t""Read from SD24",SD24_Cmd},
-                    {"aux","\r\n\t""Enable AUX power supplies",AUX_Cmd},
+                    {"aux","[tst|ctst|[DVCC|AUXVCC1|AUXVCC2|AUXVCC3 [CHG|ON|OFF|HW|TH|PRI [arg]]]]\r\n\t""Enable AUX power supplies",AUX_Cmd},
                     {"back","[m0 m1 m2 m3]\r\n\t""Read/Write to the backup memory",back_Cmd},
                    //end of list
                    {NULL,NULL,NULL}};
