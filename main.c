@@ -14,7 +14,7 @@ CTL_TASK_t idle_task;
 CTL_TASK_t terminal_task;
 
 //stack for task
-unsigned stack1[1+256+1];
+unsigned stack1[1+1000+1];
 
 
 void initCLK(void){
