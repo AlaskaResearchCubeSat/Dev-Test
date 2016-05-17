@@ -5,9 +5,11 @@
       Name="Common"
       Platform="MSP430"
       Target="MSP430F6779A"
+      libctl="Yes"
       build_use_hardware_multiplier="32-Bit Multiplier"
       linker_memory_map_file="$(PackagesDir)/targets/msp430/MSP430F6779A.xml"
       linker_section_placement_file="$(StudioDir)/targets/section_placement_info_abcd_iv64.xml"
+      macros="ARC_prefix=Z:/ARC-2/ARC2-Software"
       msp430_debug_interface="JTAG"
       msp430_identify_string="MSP430F6779A"
       msp430_insn_set="MSP430X"
@@ -32,13 +34,13 @@
   <configuration
     Name="MSP430 Debug"
     inherited_configurations="MSP430;Debug"
-    linker_additional_files="Z:/Software/lib/UART_UCA1_Debug.hza;Z:/Software/lib/termlib_Debug.hza" />
+    linker_additional_files="$(ARC_prefix)/lib/UART_UCA1_Debug.hza;$(ARC_prefix)/lib/termlib_Debug.hza" />
   <configuration Name="MSP430" Platform="MSP430" hidden="Yes" />
   <configuration Name="Debug" build_debug_information="Yes" hidden="Yes" />
   <configuration
     Name="MSP430 Release"
     inherited_configurations="MSP430;Release"
-    linker_additional_files="Z:/Software/lib/UART_UCA1_Release.hza;Z:/Software/lib/termlib_Release.hza" />
+    linker_additional_files="$(ARC_prefix)/lib/UART_UCA1_Release.hza;$(ARC_prefix)/lib/termlib_Release.hza" />
   <configuration
     Name="Release"
     build_debug_information="No"
@@ -54,8 +56,7 @@
     optimize_tail_merging="Yes" />
   <configuration
     Name="Common"
-    c_preprocessor_definitions="CTL_TASKING"
-    c_system_include_directories="$(StudioDir)/include;$(PackagesDir)/include;$(PackagesDir)/libraries/libctl/include/;Z:/Software/include/"
+    c_system_include_directories="$(StudioDir)/include;$(PackagesDir)/include;$(PackagesDir)/libraries/libctl/include/;$(ARC_prefix)/include/"
     link_symbol_definitions="CTL_IRQ_STACK_SIZE=128"
     link_use_multi_threaded_libraries="Yes"
     linker_additional_files="$(PackagesDir)/libraries/libctl/lib/libctl$(LibExt).hza"
